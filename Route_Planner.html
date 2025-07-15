@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airport Route Planner - Graph/Dijkstra Visualization</title>
+    <script src="script.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f9ff;
+            color: #1e3a8a;
+            scroll-behavior: smooth;
+        }
+        .hero-image-container {
+            height: 500px;
+            overflow: hidden;
+            position: relative;
+            transition: all 1s ease;
+        }
+        .hero-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 1s ease;
+            position: absolute;
+        }
+        .graph-node {
+            fill: #6366f1; /* Indigo 500 */
+            stroke: #4338ca; /* Indigo 700 */
+            stroke-width: 3;
+            transition: fill 0.3s ease, stroke 0.3s ease, r 0.3s ease;
+        }
+        .graph-node.start-node {
+            fill: #10b981; /* Emerald 500 */
+            stroke: #059669; /* Emerald 700 */
+            r: 14;
+        }
+        .graph-node.end-node {
+            fill: #ef4444; /* Red 500 */
+            stroke: #dc2626; /* Red 700 */
+            r: 14;
+        }
+        .graph-edge {
+            stroke: #9ca3af;
+            stroke-width: 2;
+            transition: stroke 0.3s ease, stroke-width 0.3s ease;
+        }
+        .graph-path {
+            stroke: #f97316; /* Orange 500 */
+            stroke-width: 4;
+            animation: dash 5s linear forwards;
+            stroke-dasharray: 10 5; /* Dashed line for path */
+        }
+        @keyframes dash {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+        .graph-label {
+            font-family: 'Rubik', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            fill: #1e3a8a; /* Dark blue */
+            pointer-events: none; /* Allow clicks to pass through to node */
+        }
+        .graph-distance-label {
+            font-family: 'Rubik', sans-serif;
+            font-size: 9px;
+            font-weight: 500;
+            fill: #6b7280; /* Gray 500 */
+        }
+        .graph-path-distance-label {
+            fill: #f97316; /* Orange 500 */
+            font-weight: 700;
+        }
+        .city-card {
+            transition: all 0.3s ease;
+        }
+        .city-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .scroll-container {
+            display: flex;
+            overflow-x: auto;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            gap: 2rem; /* Tailwind's gap-8 */
+            padding-bottom: 1rem; /* To prevent scrollbar from overlapping content */
+        }
+        .scroll-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .scroll-container::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 10px;
+        }
+        .scroll-container::-webkit-scrollbar-track {
+            background-color: #e5e7eb;
+        }
+        .scroll-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 9999px; /* Tailwind's rounded-full */
+            cursor: pointer;
+            z-index: 10;
+            transition: background-color 0.3s ease;
+        }
+        .scroll-button:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        .scroll-button.left {
+            left: -1.5rem; /* Adjust as needed */
+        }
+        .scroll-button.right {
+            right: -1.5rem; /* Adjust as needed */
+        }
+        .get-started-button {
+            position: absolute;
+            top: 45%;
+            left: 42%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            padding: 1rem 2.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 9999px;
+            background-color: #f97316; /* Orange 500 */
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            animation: pulse 2s infinite;
+            text-decoration: none;
+        }
+        .get-started-button:hover {
+            background-color: #ea580c; /* Orange 600 */
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+</head>
+<body>
+    <header class="bg-gradient-to-r from-blue-500 to-purple-600 text-white py-6 shadow-xl">
+        <div class="container mx-auto px-4">
+            <h1 class="text-4xl font-bold text-center mb-2">✈️ Airport Route Planner</h1>
+            <p class="text-center text-lg opacity-90">Graph Theory + Dijkstra's Algorithm Visualization</p>
+        </div>
+    </header>
+
+    <!-- Rotating Hero Images -->
+    <div class="hero-image-container relative">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/80e6683d-e8a8-42d8-b61f-a71c4ecccc23.png" alt="Global airport route map with connecting flight paths spanning continents" class="hero-image opacity-0" id="hero0">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/e509b52c-a041-4f8a-a136-03466000ce4f.png" alt="Modern airport terminal with glass walls and passengers walking" class="hero-image opacity-0" id="hero1">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/468a7409-8413-4f22-997a-e88b6d8a7983.png" alt="Airlplane flying at sunset with radar overlay showing flight paths" class="hero-image opacity-0" id="hero2">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/bd853d20-0de9-49c0-afdb-9cd5a1f82431.png" alt="Commercial airliner accelerating for takeoff on runway" class="hero-image opacity-0" id="hero3">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/90184e84-1fdd-4063-b944-df0e9244da60.png" alt="Globe with flight paths connecting major world cities" class="hero-image opacity-0" id="hero4">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/410fc661-ab19-4f9d-826c-6f8e8357072e.png" alt="Airport control tower at golden hour with planes parked" class="hero-image opacity-0" id="hero5">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/4fbb99be-07bb-4a75-89b4-feb0e3d1ce66.png" alt="Flight attendant pointing to interactive route map" class="hero-image opacity-0" id="hero6">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/6dabb4b6-c961-4625-9777-80e01179cf99.png" alt="Visualization of graph nodes and edges representing flight paths" class="hero-image opacity-0" id="hero7">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/fc205fdf-c3f7-42fd-9b27-ad5000488225.png" alt="Mathematical equations showing Dijkstra's shortest path algorithm" class="hero-image opacity-0" id="hero8">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/756e3287-8323-4b64-a8b9-3c16b3680f7f.png" alt="Flight map highlighting multiple routes and their distances" class="hero-image opacity-0" id="hero9">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/7fe11567-b9aa-4177-9047-66047ea4c2a0.png" alt="Large cargo plane being loaded with containers at sunrise" class="hero-image opacity-0" id="hero10">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/07c89a3c-b6db-4781-9807-ef68b768b214.png" alt="Airplane flying through cloudy night sky with city lights below" class="hero-image opacity-0" id="hero11">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/2940a584-ed5e-4c26-9d5e-bacde33203a9.png" alt="Interior of busy airport hub with passengers and shops" class="hero-image opacity-0" id="hero12">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/003e783f-c81f-40aa-99c0-a1da88d66276.png" alt="Perspective view of illuminated airport runway at dusk" class="hero-image opacity-0" id="hero13">
+        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/5db79268-33ac-4cd1-8cbb-04a60f291f66.png" alt="Digital flight information board showing arrivals and departures" class="hero-image opacity-0" id="hero14">
+        <a href="#find-optimal-routes" class="get-started-button hover:bg-orange-600 ">Get Started!</a>
+    </div>
+
+    <main class="container mx-auto px-4 py-12" id="find-optimal-routes">
+        <div class="bg-white rounded-xl shadow-lg p-8 mb-12">
+            <h2 class="text-3xl font-bold mb-6 text-center text-blue-600">Find Optimal Flight Routes</h2>
+            
+            <div class="mb-8">
+                <h3 class="text-xl font-semibold mb-4 text-purple-600">Flight Type</h3>
+                <select id="flightType" class="w-full px-4 py-3 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:outline-none transition">
+                    <option value="">Select Flight Type</option>
+                    <option value="international">International Flights</option>
+                    <option value="domestic">Domestic Flights (India)</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                <div>
+                    <h3 class="text-xl font-semibold mb-4 text-purple-600">Departure City</h3>
+                    <select id="departure" class="w-full px-4 py-3 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:outline-none transition">
+                        <option value="">Select Departure</option>
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold mb-4 text-purple-600">Destination City</h3>
+                    <select id="destination" class="w-full px-4 py-3 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:outline-none transition">
+                        <option value="">Select Destination</option>
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+
+            <button id="calculateRoute" class="w-full md:w-1/2 mx-auto block bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mb-8">
+                Find Shortest Route ✈️
+            </button>
+
+            <div id="routeInfo" class="hidden bg-blue-50 rounded-xl p-6 mb-12">
+                <h3 class="text-2xl font-bold mb-4 text-blue-700">Route Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h4 class="font-semibold text-gray-700">Total Distance</h4>
+                        <p id="totalDistance" class="text-3xl font-bold text-purple-600">-- km</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h4 class="font-semibold text-gray-700">Flight Time</h4>
+                        <p id="flightTime" class="text-3xl font-bold text-blue-600">-- hr -- min</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h4 class="font-semibold text-gray-700">Estimated Cost</h4>
+                        <p id="estimatedCost" class="text-3xl font-bold text-green-600">-- USD</p>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-semibold text-gray-700 mb-3">Route Details</h4>
+                    <div id="routeDetails" class="bg-white p-4 rounded-lg shadow">
+                        <p>Select departure and destination to see route details.</p>
+                    </div>
+                </div>
+            </div>
+
+            <svg id="graphVisualization" width="100%" height="500px" viewBox="0 0 900 600" class="bg-white rounded-xl shadow-lg p-4"></svg>
+        </div>
+
+        <div class="relative mb-12">
+            <button id="scrollLeft" class="scroll-button left">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <div id="cityCardsContainer" class="scroll-container">
+                <!-- City cards will be populated by JavaScript -->
+            </div>
+            <button id="scrollRight" class="scroll-button right">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg p-8">
+            <h2 class="text-3xl font-bold mb-6 text-center text-blue-600">How It Works</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-gray-50 p-6 rounded-lg border border-blue-100">
+                    <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Graph Representation</h3>
+                    <p class="text-gray-700">Cities are nodes in the graph. Direct flight routes are edges connecting these nodes, weighted by distance.</p>
+                </div>
+                <div class="bg-gray-50 p-6 rounded-lg border border-blue-100">
+                    <div class="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center text-white mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Dijkstra's Algorithm</h3>
+                    <p class="text-gray-700">Finds the shortest path between two nodes by systematically exploring nearest nodes first.</p>
+                </div>
+                <div class="bg-gray-50 p-6 rounded-lg border border-blue-100">
+                    <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center text-white mb-4 pulse-animation">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Optimal Routes</h3>
+                    <p class="text-gray-700">Computes the most efficient route by minimizing total distance traveled between origin and destination.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-900 text-white py-10">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-6 md:mb-0">
+                    <h2 class="text-2xl font-bold mb-2">Airport Route Planner</h2>
+                    <p class="text-gray-400">Graph Theory & Dijkstra's Algorithm Visualization</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="bg-gray-800 hover:bg-gray-700 p-3 rounded-full transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M22.675 0H1.325C.593 0 0 .593 0 1.325v21.351C0 23.407.593 24 1.325 24H12.82v-9.294H9.692v-3.622h3.128V8.413c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12V24h6.116c.73 0 1.323-.593 1.323-1.325V1.325C24 .593 23.407 0 22.675 0z"/>
+                        </svg>
+                    </a>
+                    <a href="#" class="bg-gray-800 hover:bg-gray-700 p-3 rounded-full transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-1.622 0-3.131-.476-4.402-1.291 1.524.18 3.045-.244 4.252-1.189-1.256-.023-2.317-.854-2.684-1.995.451.086.895.061 1.298-.049-1.381-.278-2.335-1.522-2.304-2.853.388.215.83.344 1.301.359-1.279-.855-1.641-2.544-.889-3.835 1.416 1.738 3.533 2.881 5.92 3.001-.419-1.796.944-3.527 2.799-3.527.825 0 1.572.349 2.096.907.654-.128 1.27-.368 1.824-.697-.215.671-.67 1.233-1.263 1.589.581-.07 1.135-.224 1.649-.453-.384.578-.87 1.084-1.433 1.489z"/>
+                        </svg>
+                    </a>
+                    <a href="#" class="bg-gray-800 hover:bg-gray-700 p-3 rounded-full transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.261 2.913-.558.788-.306 1.459-.717 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.228.058 1.285.073 1.645.073 4.85s-.015 3.585-.072 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.481.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.058-1.649.072-4.859.072-3.211 0-3.586-.015-4.859-.072-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>© 2025 Airport Route Planner. All rights reserved.</p>
+                <p>By Neeraj Negi</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Rotating hero images
+        let currentHero = 0;
+        const heroImages = document.querySelectorAll('.hero-image');
+        heroImages[currentHero].classList.remove('opacity-0');
+
+        function rotateHeroImages() {
+            heroImages[currentHero].classList.add('opacity-0');
+            currentHero = (currentHero + 1) % heroImages.length;
+            heroImages[currentHero].classList.remove('opacity-0');
+        }
+
+        setInterval(rotateHeroImages, 3000);
+
+        // Airport graph data structures
+        const internationalGraph = {
+            nodes: [
+                { id: 'Delhi', x: 400, y: 300, name: 'Delhi, India (DEL)' },
+                { id: 'Mumbai', x: 380, y: 380, name: 'Mumbai, India (BOM)' },
+                { id: 'Bangalore', x: 420, y: 450, name: 'Bangalore, India (BLR)' },
+                { id: 'New York', x: 100, y: 150, name: 'New York, USA (JFK)' },
+                { id: 'London', x: 200, y: 100, name: 'London, UK (LHR)' },
+                { id: 'Tokyo', x: 700, y: 200, name: 'Tokyo, Japan (HND)' },
+                { id: 'Sydney', x: 750, y: 450, name: 'Sydney, Australia (SYD)' },
+                { id: 'Dubai', x: 300, y: 250, name: 'Dubai, UAE (DXB)' },
+                { id: 'Singapore', x: 550, y: 350, name: 'Singapore (SIN)' },
+                { id: 'Paris', x: 250, y: 150, name: 'Paris, France (CDG)' },
+                { id: 'Beijing', x: 650, y: 150, name: 'Beijing, China (PEK)' },
+                { id: 'Toronto', x: 80, y: 120, name: 'Toronto, Canada (YYZ)' },
+                { id: 'Sao Paulo', x: 150, y: 400, name: 'Sao Paulo, Brazil (GRU)' },
+                { id: 'Johannesburg', x: 350, y: 450, name: 'Johannesburg, South Africa (JNB)' },
+                { id: 'Cairo', x: 300, y: 200, name: 'Cairo, Egypt (CAI)' },
+                { id: 'Wellington', x: 600, y: 500, name: 'Wellington, New Zealand (WLG)' }
+            ],
+            edges: [
+                { source: 'Delhi', target: 'Dubai', distance: 2200 },
+                { source: 'Delhi', target: 'London', distance: 6700 },
+                { source: 'Mumbai', target: 'Dubai', distance: 1900 },
+                { source: 'Mumbai', target: 'London', distance: 7200 },
+                { source: 'Bangalore', target: 'Singapore', distance: 3100 },
+                { source: 'New York', target: 'London', distance: 5500 },
+                { source: 'New York', target: 'Toronto', distance: 550 },
+                { source: 'London', target: 'Paris', distance: 350 },
+                { source: 'Tokyo', target: 'Beijing', distance: 2100 },
+                { source: 'Tokyo', target: 'Singapore', distance: 5300 },
+                { source: 'Sydney', target: 'Singapore', distance: 6300 },
+                { source: 'Dubai', target: 'Cairo', distance: 2200 },
+                { source: 'Dubai', target: 'Johannesburg', distance: 6400 },
+                { source: 'Singapore', target: 'Beijing', distance: 4500 },
+                { source: 'Singapore', target: 'Delhi', distance: 4100 },
+                { source: 'Paris', target: 'New York', distance: 5800 },
+                { source: 'Beijing', target: 'London', distance: 8100 },
+                { source: 'Toronto', target: 'London', distance: 5700 },
+                { source: 'Sao Paulo', target: 'Johannesburg', distance: 6500 },
+                { source: 'Sao Paulo', target: 'New York', distance: 7700 },
+                { source: 'Johannesburg', target: 'Sydney', distance: 11000 },
+                { source: 'Cairo', target: 'Paris', distance: 3200 },
+                { source: 'Wellington', target: 'Sydney', distance: 2200 },
+                { source: 'Wellington', target: 'Singapore', distance: 9000 },
+                { source: 'Wellington', target: 'Tokyo', distance: 8800 }
+            ]
+        };
+
+        const domesticGraph = {
+            nodes: [
+                { id: 'Delhi', x: 450, y: 100, name: 'Delhi (DEL)' },
+                { id: 'Mumbai', x: 250, y: 400, name: 'Mumbai (BOM)' },
+                { id: 'Bangalore', x: 380, y: 500, name: 'Bangalore (BLR)' },
+                { id: 'Chennai', x: 500, y: 530, name: 'Chennai (MAA)' },
+                { id: 'Kolkata', x: 700, y: 250, name: 'Kolkata (CCU)' },
+                { id: 'Hyderabad', x: 450, y: 430, name: 'Hyderabad (HYD)' },
+                { id: 'Ahmedabad', x: 200, y: 280, name: 'Ahmedabad (AMD)' },
+                { id: 'Pune', x: 300, y: 430, name: 'Pune (PNQ)' },
+                { id: 'Jaipur', x: 350, y: 180, name: 'Jaipur (JAI)' },
+                { id: 'Lucknow', x: 550, y: 180, name: 'Lucknow (LKO)' },
+                { id: 'Goa', x: 280, y: 480, name: 'Goa (GOI)' },
+                { id: 'Kochi', x: 400, y: 570, name: 'Kochi (COK)' },
+                { id: 'Chandigarh', x: 420, y: 50, name: 'Chandigarh (IXC)' },
+                { id: 'Guwahati', x: 800, y: 180, name: 'Guwahati (GAU)' },
+                { id: 'Bhubaneswar', x: 650, y: 400, name: 'Bhubaneswar (BBI)' },
+                { id: 'Indore', x: 350, y: 300, name: 'Indore (IDR)' }
+            ],
+            edges: [
+                { source: 'Delhi', target: 'Mumbai', distance: 1150 },
+                { source: 'Delhi', target: 'Kolkata', distance: 1300 },
+                { source: 'Delhi', target: 'Jaipur', distance: 250 },
+                { source: 'Delhi', target: 'Lucknow', distance: 420 },
+                { source: 'Delhi', target: 'Chandigarh', distance: 230 },
+                { source: 'Mumbai', target: 'Bangalore', distance: 850 },
+                { source: 'Mumbai', target: 'Hyderabad', distance: 620 },
+                { source: 'Mumbai', target: 'Ahmedabad', distance: 440 },
+                { source: 'Mumbai', target: 'Pune', distance: 120 },
+                { source: 'Mumbai', target: 'Goa', distance: 420 },
+                { source: 'Bangalore', target: 'Chennai', distance: 290 },
+                { source: 'Bangalore', target: 'Hyderabad', distance: 500 },
+                { source: 'Bangalore', target: 'Kochi', distance: 350 },
+                { source: 'Chennai', target: 'Kochi', distance: 550 },
+                { source: 'Kolkata', target: 'Bhubaneswar', distance: 440 },
+                { source: 'Kolkata', target: 'Guwahati', distance: 500 },
+                { source: 'Hyderabad', target: 'Chennai', distance: 520 },
+                { source: 'Ahmedabad', target: 'Indore', distance: 380 },
+                { source: 'Jaipur', target: 'Indore', distance: 500 },
+                { source: 'Lucknow', target: 'Kolkata', distance: 900 },
+                { source: 'Pune', target: 'Bangalore', distance: 800 },
+                { source: 'Goa', target: 'Bangalore', distance: 450 },
+                { source: 'Kochi', target: 'Mumbai', distance: 1000 },
+                { source: 'Chandigarh', target: 'Jaipur', distance: 500 },
+                { source: 'Guwahati', target: 'Delhi', distance: 1500 },
+                { source: 'Bhubaneswar', target: 'Hyderabad', distance: 700 },
+                { source: 'Indore', target: 'Mumbai', distance: 580 }
+            ]
+        };
+
+        const internationalCityCards = [
+            { name: 'Delhi, India', airport: 'Indira Gandhi International', code: 'DEL', img: 'https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/7f4e9613-4265-4015-9e8f-7accfb3c6ba4.png', description: 'Key international hub connecting South Asia with global destinations.', color: 'blue' },
+            { name: 'Mumbai, India', airport: 'Chhatrapati Shivaji Maharaj', code: 'BOM', img: 'https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/d632aef5-907b-4a7b-9f61-5d7586d53c54.png', description: 'Financial capital of India with busy international flight connections.', color: 'green' },
+            { name: 'New York, USA', airport: 'John F. Kennedy International', code: 'JFK', img: 'https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/01dc3a5c-9eb8-4809-aedb-49924c8801dc.png', description: 'Major transatlantic gateway with hub connections worldwide.', color: 'purple' },
+            { name: 'London, UK', airport: 'Heathrow Airport', code: 'LHR', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/London_Eye_at_night_2008.jpg/1280px-London_Eye_at_night_2008.jpg', description: 'One of the world\'s busiest airports, a major global hub.', color: 'red' },
+            { name: 'Tokyo, Japan', airport: 'Haneda Airport', code: 'HND', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Tokyo_Tower_and_Zojoji_Temple.jpg/1280px-Tokyo_Tower_and_Zojoji_Temple.jpg', description: 'Primary international gateway to Japan, serving East Asia.', color: 'yellow' },
+            { name: 'Sydney, Australia', airport: 'Sydney Airport', code: 'SYD', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Sydney_Opera_House_and_Harbour_Bridge_at_sunset.jpg/1280px-Sydney_Opera_House_and_Harbour_Bridge_at_sunset.jpg', description: 'Main airport serving Sydney and a primary gateway to Australia.', color: 'indigo' },
+            { name: 'Dubai, UAE', airport: 'Dubai International Airport', code: 'DXB', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Burj_Khalifa_at_night.jpg/1280px-Burj_Khalifa_at_night.jpg', description: 'A major aviation hub in the Middle East, connecting East and West.', color: 'pink' },
+            { name: 'Singapore', airport: 'Changi Airport', code: 'SIN', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Singapore_Skyline_at_Dusk.jpg/1280px-Singapore_Skyline_at_Dusk.jpg', description: 'Consistently ranked among the world\'s best airports.', color: 'teal' }
+        ];
+
+        const domesticCityCards = [
+            { name: 'Delhi, India', airport: 'Indira Gandhi International', code: 'DEL', img: 'https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/7f4e9613-4265-4015-9e8f-7accfb3c6ba4.png', description: 'Capital city and a major domestic air travel hub.', color: 'blue' },
+            { name: 'Mumbai, India', airport: 'Chhatrapati Shivaji Maharaj', code: 'BOM', img: 'https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/d632aef5-907b-4a7b-9f61-5d7586d53c54.png', description: 'India\'s financial capital and a bustling domestic airport.', color: 'green' },
+            { name: 'Bangalore, India', airport: 'Kempegowda International', code: 'BLR', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Bangalore_skyline.jpg/1280px-Bangalore_skyline.jpg', description: 'IT hub of India with significant domestic air traffic.', color: 'purple' },
+            { name: 'Chennai, India', airport: 'Chennai International', code: 'MAA', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Chennai_Marina_Beach_Lighthouse.jpg/1280px-Chennai_Marina_Beach_Lighthouse.jpg', description: 'Major gateway to South India and a busy domestic airport.', color: 'red' },
+            { name: 'Kolkata, India', airport: 'Netaji Subhas Chandra Bose International', code: 'CCU', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Howrah_Bridge_at_night.jpg/1280px-Howrah_Bridge_at_night.jpg', description: 'Gateway to Eastern India with strong domestic connections.', color: 'yellow' },
+            { name: 'Hyderabad, India', airport: 'Rajiv Gandhi International', code: 'HYD', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Charminar_Hyderabad.jpg/1280px-Charminar_Hyderabad.jpg', description: 'A growing tech city with increasing domestic flight demand.', color: 'indigo' },
+            { name: 'Ahmedabad, India', airport: 'Sardar Vallabhbhai Patel International', code: 'AMD', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Sabarmati_Riverfront_Ahmedabad.jpg/1280px-Sabarmati_Riverfront_Ahmedabad.jpg', description: 'Largest city in Gujarat, an important domestic air hub.', color: 'pink' },
+            { name: 'Pune, India', airport: 'Pune Airport', code: 'PNQ', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Shaniwar_Wada_Pune.jpg/1280px-Shaniwar_Wada_Pune.jpg', description: 'Known for its educational institutions and growing IT sector.', color: 'teal' },
+            { name: 'Jaipur, India', airport: 'Jaipur International', code: 'JAI', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Hawa_Mahal_Jaipur.jpg/1280px-Hawa_Mahal_Jaipur.jpg', description: 'The Pink City, a popular tourist destination with good air links.', color: 'orange' },
+            { name: 'Lucknow, India', airport: 'Chaudhary Charan Singh International', code: 'LKO', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Bara_Imambara_Lucknow.jpg/1280px-Bara_Imambara_Lucknow.jpg', description: 'Capital of Uttar Pradesh, a cultural and administrative hub.', color: 'cyan' },
+            { name: 'Goa, India', airport: 'Goa International Airport', code: 'GOI', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Goa_beach.jpg/1280px-Goa_beach.jpg', description: 'India\'s premier beach destination, highly popular for domestic tourism.', color: 'lime' },
+            { name: 'Kochi, India', airport: 'Cochin International', code: 'COK', img: 'https://upload.wikimedia.com/wikipedia/commons/thumb/a/a7/Fort_Kochi_Chinese_Fishing_Nets.jpg/1280px-Fort_Kochi_Chinese_Fishing_Nets.jpg', description: 'Gateway to Kerala, a significant port city and tourist spot.', color: 'emerald' },
+            { name: 'Chandigarh, India', airport: 'Chandigarh International', code: 'IXC', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Rock_Garden_Chandigarh.jpg/1280px-Rock_Garden_Chandigarh.jpg', description: 'Planned city and a key hub for Punjab and Haryana.', color: 'rose' },
+            { name: 'Guwahati, India', airport: 'Lokpriya Gopinath Bordoloi International', code: 'GAU', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Kamakhya_Temple_Guwahati.jpg/1280px-Kamakhya_Temple_Guwahati.jpg', description: 'Largest city in Northeast India, connecting the region.', color: 'fuchsia' },
+            { name: 'Bhubaneswar, India', airport: 'Biju Patnaik International', code: 'BBI', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Lingaraj_Temple_Bhubaneswar.jpg/1280px-Lingaraj_Temple_Bhubaneswar.jpg', description: 'Capital of Odisha, known for its ancient temples.', color: 'violet' },
+            { name: 'Indore, India', airport: 'Devi Ahilya Bai Holkar Airport', code: 'IDR', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Rajwada_Indore.jpg/1280px-Rajwada_Indore.jpg', description: 'Largest city in Madhya Pradesh, a commercial hub.', color: 'amber' }
+        ];
+
+        let currentGraph = internationalGraph;
+        let currentCityCards = internationalCityCards;
+
+        const flightTypeSelect = document.getElementById('flightType');
+        const departureSelect = document.getElementById('departure');
+        const destinationSelect = document.getElementById('destination');
+        const cityCardsContainer = document.getElementById('cityCardsContainer');
+        const scrollLeftBtn = document.getElementById('scrollLeft');
+        const scrollRightBtn = document.getElementById('scrollRight');
+
+        function populateCityDropdowns(graph) {
+            departureSelect.innerHTML = '<option value="">Select Departure</option>';
+            destinationSelect.innerHTML = '<option value="">Select Destination</option>';
+            graph.nodes.forEach(node => {
+                const option1 = document.createElement('option');
+                option1.value = node.id;
+                option1.textContent = node.name;
+                departureSelect.appendChild(option1);
+
+                const option2 = document.createElement('option');
+                option2.value = node.id;
+                option2.textContent = node.name;
+                destinationSelect.appendChild(option2);
+            });
+        }
+
+        function renderCityCards(cards) {
+            cityCardsContainer.innerHTML = '';
+            cards.forEach(card => {
+                const cardHtml = `
+                    <div class="bg-gradient-to-br from-${card.color}-400 to-${card.color}-600 text-white rounded-xl p-6 shadow-xl city-card flex-none w-80">
+                        <img src="${card.img}" alt="${card.name} skyline" class="w-full h-48 object-cover rounded-lg mb-4">
+                        <h3 class="text-xl font-bold mb-2">${card.name}</h3>
+                        <p class="mb-4">${card.description}</p>
+                        <div class="flex items-center">
+                            <span class="inline-block bg-${card.color}-700 rounded-full px-3 py-1 text-sm font-semibold text-white mr-2">${card.code}</span>
+                            <span class="text-sm opacity-80">${card.airport}</span>
+                        </div>
+                    </div>
+                `;
+                cityCardsContainer.insertAdjacentHTML('beforeend', cardHtml);
+            });
+        }
+
+        function updateUIForFlightType() {
+            const selectedType = flightTypeSelect.value;
+            if (selectedType === 'international') {
+                currentGraph = internationalGraph;
+                currentCityCards = internationalCityCards;
+            } else {
+                currentGraph = domesticGraph;
+                currentCityCards = domesticCityCards;
+            }
+            populateCityDropdowns(currentGraph);
+            renderGraph(); // Render graph with no path highlighted initially
+            renderCityCards(currentCityCards);
+            document.getElementById('routeInfo').classList.add('hidden'); // Hide route info on type change
+        }
+
+        // Render initial graph
+        function renderGraph(highlightPath = [], startNodeId = null, endNodeId = null) {
+            const svg = document.getElementById('graphVisualization');
+            svg.innerHTML = '';
+
+            // Draw edges first (so they're behind nodes)
+            currentGraph.edges.forEach(edge => {
+                const sourceNode = currentGraph.nodes.find(n => n.id === edge.source);
+                const targetNode = currentGraph.nodes.find(n => n.id === edge.target);
+                
+                const isInPath = highlightPath.some(step => 
+                    (step.from === edge.source && step.to === edge.target) || 
+                    (step.from === edge.target && step.to === edge.source)
+                );
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', sourceNode.x);
+                line.setAttribute('y1', sourceNode.y);
+                line.setAttribute('x2', targetNode.x);
+                line.setAttribute('y2', targetNode.y);
+                line.setAttribute('class', isInPath ? 'graph-path' : 'graph-edge');
+                if (isInPath) line.setAttribute('stroke-dasharray', 5);
+                svg.appendChild(line);
+
+                // Distance label
+                const midX = (sourceNode.x + targetNode.x) / 2;
+                const midY = (sourceNode.y + targetNode.y) / 2;
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', midX);
+                text.setAttribute('y', midY - 5); /* Adjust position to be above line */
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('class', isInPath ? 'graph-distance-label graph-path-distance-label' : 'graph-distance-label');
+                text.textContent = edge.distance + ' km';
+                svg.appendChild(text);
+            });
+
+            // Draw nodes
+            currentGraph.nodes.forEach(node => {
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', node.x);
+                circle.setAttribute('cy', node.y);
+                circle.setAttribute('r', 12);
+                circle.setAttribute('class', 'graph-node cursor-pointer');
+                if (node.id === startNodeId) {
+                    circle.classList.add('start-node');
+                } else if (node.id === endNodeId) {
+                    circle.classList.add('end-node');
+                }
+                circle.setAttribute('data-city', node.id);
+                circle.addEventListener('click', () => {
+                    const selectElement = highlightPath.length ? document.getElementById('destination') : document.getElementById('departure');
+                    selectElement.value = node.id;
+                });
+                svg.appendChild(circle);
+
+                // City label
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x);
+                text.setAttribute('y', node.y - 18); /* Adjust position to be above node */
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('class', 'graph-label');
+                text.textContent = node.id;
+                svg.appendChild(text);
+            });
+        }
+
+        // Dijkstra's algorithm implementation
+        function findShortestPath(graph, start, end) {
+            const distances = {};
+            const previous = {};
+            const nodes = new Set();
+            const visited = new Set();
+            
+            // Initialize distances to infinity and previous nodes to null
+            graph.nodes.forEach(node => {
+                distances[node.id] = Infinity;
+                previous[node.id] = null;
+                nodes.add(node.id);
+            });
+            
+            distances[start] = 0;
+            
+            while (nodes.size) {
+                let smallest = null;
+                nodes.forEach(node => {
+                    if (smallest === null || distances[node] < distances[smallest]) {
+                        smallest = node;
+                    }
+                });
+                
+                if (smallest === null || smallest === end) break;
+                
+                nodes.delete(smallest);
+                visited.add(smallest);
+                
+                // Find all edges from the current node
+                const edges = graph.edges.filter(edge => 
+                    edge.source === smallest || edge.target === smallest
+                );
+                
+                edges.forEach(edge => {
+                    const neighbor = edge.source === smallest ? edge.target : edge.source;
+                    if (visited.has(neighbor)) return;
+                    
+                    const alt = distances[smallest] + edge.distance;
+                    if (alt < distances[neighbor]) {
+                        distances[neighbor] = alt;
+                        previous[neighbor] = smallest;
+                    }
+                });
+            }
+            
+            // Reconstruct the path
+            const path = [];
+            let city = end;
+            
+            while (previous[city]) {
+                path.unshift({ from: previous[city], to: city });
+                city = previous[city];
+            }
+            
+            return {
+                path,
+                distance: distances[end]
+            };
+        }
+
+        // Handle route calculation
+        document.getElementById('calculateRoute').addEventListener('click', () => {
+            const departure = document.getElementById('departure').value;
+            const destination = document.getElementById('destination').value;
+            
+            if (!departure || !destination) {
+                alert('Please select both departure and destination cities');
+                return;
+            }
+            
+            if (departure === destination) {
+                alert('Departure and destination cannot be the same');
+                return;
+            }
+            
+            const result = findShortestPath(currentGraph, departure, destination);
+            
+            if (result.distance === Infinity) {
+                document.getElementById('routeInfo').classList.add('hidden');
+                alert('No route found between these cities');
+                return;
+            }
+            
+            // Update UI with route information
+            document.getElementById('totalDistance').textContent = result.distance + ' km';
+            
+            const flightTimeHours = Math.floor(result.distance / 800); // assuming average speed 800 km/h
+            const flightTimeMinutes = Math.round((result.distance % 800) / 800 * 60);
+            document.getElementById('flightTime').textContent = flightTimeHours + ' hr ' + flightTimeMinutes + ' min';
+            
+            const estimatedCost = Math.round(result.distance * 0.15); // assuming 0.15 USD per km
+            document.getElementById('estimatedCost').textContent = '$' + estimatedCost.toLocaleString();
+            
+            // Build route details text
+            let routeText = `<ul class="space-y-2">`;
+            result.path.forEach((segment, index) => {
+                const sourceNode = currentGraph.nodes.find(n => n.id === segment.from);
+                const targetNode = currentGraph.nodes.find(n => n.id === segment.to);
+                const edge = currentGraph.edges.find(e => 
+                    (e.source === segment.from && e.target === segment.to) ||
+                    (e.source === segment.to && e.target === segment.from)
+                );
+                
+                routeText += `
+                    <li class="flex items-center ${index === 0 ? 'font-bold text-blue-600' : ''}">
+                        ${index > 0 ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>' : ''}
+                        ${sourceNode.name} → ${targetNode.name} (${edge.distance} km)
+                    </li>`;
+            });
+            routeText += `</ul>`;
+            
+            document.getElementById('routeDetails').innerHTML = routeText;
+            document.getElementById('routeInfo').classList.remove('hidden');
+            
+            // Re-render graph with highlighted path and start/end nodes
+            renderGraph(result.path, departure, destination);
+        });
+
+        // Event listener for flight type change
+        flightTypeSelect.addEventListener('change', updateUIForFlightType);
+
+        // Scroll buttons for city cards
+        scrollLeftBtn.addEventListener('click', () => {
+            cityCardsContainer.scrollBy({
+                left: -cityCardsContainer.offsetWidth / 2, // Scroll half the container width
+                behavior: 'smooth'
+            });
+        });
+
+        scrollRightBtn.addEventListener('click', () => {
+            cityCardsContainer.scrollBy({
+                left: cityCardsContainer.offsetWidth / 2, // Scroll half the container width
+                behavior: 'smooth'
+            });
+        });
+
+        // Initialize UI
+        updateUIForFlightType(); // Set initial state based on default selected flight type
+    </script>
+</body>
+</html>
